@@ -51,7 +51,9 @@ class SetupFrame:
 
         def connect():
             print("connect")
-            map = self.boardSetterUpper.portMap
+            map = self.boardSetterUpper.getAllPortsMap()
+            port = self.selectedPort.get()
+            print(f"port selected = {port} ")
             value = map.get( self.selectedPort.get())
             print(f"value = {value} ")
             self.connectionMessage.set("Connecting... Please wait")
@@ -61,7 +63,6 @@ class SetupFrame:
             if self.isConnected:   
                 self.lightCanvas.itemconfig(self.greenLight,fill="green")
                 # self.connection_frame.config(self.connectionLabel,text="Arduino Connected.")
-                
                 # self.boardInteractor = BoardInteractor(self.boardSetterUpper.board) 
                 self.connectionMessage.set("Arduino Connected.")
                 self.connectionLabel.update_idletasks()
@@ -79,9 +80,11 @@ class SetupFrame:
         def refreshPortList():
             self.ports = self.boardSetterUpper.getAllPortNamesAndDevices()
             self.selectedPort.set(self.boardSetterUpper.ArduinoPort)
-            # self.combo.config(values = self.ports,textvariable=self.selectedPort)
-            self.combo = ttk.Combobox(self.connection_frame, values=self.ports, state="readonly", textvariable=self.selectedPort, width=45)
-            self.combo.grid(row=0,column=1,columnspan=3)
+            print("Selected Port: "+self.selectedPort.get())
+            self.combo.config(values = self.ports, textvariable=self.selectedPort)
+            # self.combo = ttk.Combobox(self.connection_frame, values=self.ports, state="readonly", textvariable=self.selectedPort, width=45)
+            
+            # self.combo.grid(row=0,column=1,columnspan=3)
 
             self.isConnected = self.boardSetterUpper.isConnected
 
@@ -108,17 +111,15 @@ class SetupFrame:
 
     def createArduinoControllerFrame(self):
         print("Creating Arduino frame")
-
         self.dataVar = tk.StringVar()
         self.dataVar.set("Press \"Begin Data Collection\" to start reading ")
-
         self.arduino_controller = tk.LabelFrame(self.controls_tab, bg="#8A9A5B",text="Arduino Controls")
         self.arduino_controller.pack(padx=20,pady=20)
         # tk.Label(self.arduino_controller,text="Arduino Controls").grid(row=0,column=0,padx=10,pady=5)
-
-        lf = tk.Label(self.arduino_controller, text="Threshold Value")
+        lf = tk.Label(self.arduino_controller, text="Threshold Value 0V -> 5V ")
         lf.grid(row=2,column=0,padx=5,pady=5)
 
+        # Sensor Value is what is going to be sent to the arduino. (We can convert any values after the fact)
         entry = tk.Entry(self.arduino_controller,bg="lightgrey",textvariable=self.triggerValue)
         entry.grid(row=2,column=1,padx=5,pady=5)
 
@@ -128,8 +129,10 @@ class SetupFrame:
         def submit():
             try:
                 if self.isConnected:
-                    value = float(self.triggerValue.get())
-                    self.boardInteractor.setThreshold(value)
+                    voltage = float(self.triggerValue.get())
+                    sensorValue = voltage / 5 
+                    pressure = (voltage -0.225) / 0.7665
+                    self.boardInteractor.setThreshold(sensorValue)
                 else:
                     print("Could not set threshold because board is not connected.")
             except Exception as E:
@@ -140,7 +143,7 @@ class SetupFrame:
                 data = self.boardInteractor.getData()
                 value = data.get_nowait()
                 self.dataValue.config(text=value)
-                print(f"data = {value}")
+                print(f"{value}")
 
         def pullDataQueue():
            threading.Thread(target=recurringcall,daemon=True).start()

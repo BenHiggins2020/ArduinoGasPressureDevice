@@ -5,7 +5,9 @@ from repository.BoardSetupHandler import BoardSetupHandler
 from serial.tools.list_ports_common import *
 import threading
 from application.setupFrame import SetupFrame
+from application.helpTab import HelpFrame
 
+#TODO: Create a settings file which can be configured and parsed to that things like file location, can be saved like persistant data...
 root = tk.Tk()
 root.geometry("600x600")
 root.title("Pressure Measurement Controller")
@@ -42,6 +44,13 @@ notebook.add(settings_tab, text="Settings")
 
 tk.Label(settings_tab, text="Refresh Rate (ms):").pack(pady=10)
 tk.Entry(settings_tab).pack()
+
+# === Tab 4: Help ===
+help_tab = tk.Frame(notebook, bg="#F8F8F8")
+notebook.add(help_tab, text="Help")
+helpFrame = HelpFrame(help_tab)
+
+
 
 root.mainloop()
 

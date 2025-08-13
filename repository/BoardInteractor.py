@@ -1,6 +1,7 @@
 from pyfirmata import Arduino, util
 import queue
 import threading
+from datetime import datetime
 # This class simply interacts with the Arduino board. 
 # it will read sensor values and write to the digital pin.
 # It will output values to a queue.
@@ -40,18 +41,23 @@ class BoardInteractor:
     
     #This command will read sensor data only
     def run(self):
+        valveState = "CLOSED"
         while self.running:
             raw = self.readPin.read()
             if(raw is not None):
-                self.dataQueue.put(raw)
-
+                
                 threshold = self.getThreshold()
-                print(f"sensor: {raw} , threshold: {threshold}")
+                # print(f"sensor: {raw} , threshold: {threshold}")
                 if(raw >= threshold):
                     self.writePin.write(1)
+                    valveState = "OPEN"
                     # print("OPEN")
                 else:
                     self.writePin.write(0)
+                    valveState = "CLOSED"
+
+                self.dataQueue.put({"raw":raw, "threshold":threshold, "timestamp":datetime.now().strftime("%H:%M:%S.%f")[:-3], "valveState":valveState})
+
 
 
                 #for this case we are reading valid values.
