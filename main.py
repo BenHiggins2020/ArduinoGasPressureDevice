@@ -6,14 +6,15 @@ from serial.tools.list_ports_common import *
 import threading
 from application.setupFrame import SetupFrame
 from application.helpTab import HelpFrame
+from application.ExcelFrame import ExcelFrame
 
 #TODO: Create a settings file which can be configured and parsed to that things like file location, can be saved like persistant data...
 root = tk.Tk()
 root.geometry("600x600")
 root.title("Pressure Measurement Controller")
 
-# lf = tk.LabelFrame(root, text="Sensor Controls")
-# lf.pack()
+
+isConnected = threading.Event() # Reactive and shared connection state.
 
 boardSetterUpper = BoardSetupHandler()
 
@@ -39,11 +40,9 @@ notebook.add(plot_tab, text="Live Plot")
 # You could embed a matplotlib canvas here later
 
 # === Tab 3: Settings ===
-settings_tab = tk.Frame(notebook, bg="#F8F8F8")
-notebook.add(settings_tab, text="Settings")
-
-tk.Label(settings_tab, text="Refresh Rate (ms):").pack(pady=10)
-tk.Entry(settings_tab).pack()
+excel_tab = tk.Frame(notebook, bg="#F8F8F8")
+notebook.add(excel_tab, text="Excel")
+excel_frame = ExcelFrame(excel_tab)
 
 # === Tab 4: Help ===
 help_tab = tk.Frame(notebook, bg="#F8F8F8")
