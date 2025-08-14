@@ -1,4 +1,4 @@
-from BoardInteractor import BoardInteractor
+from repository.BoardInteractor import BoardInteractor
 import openpyxl
 from openpyxl import *
 from datetime import datetime
@@ -6,9 +6,13 @@ import os
 import queue
 import threading
 from queue import *
+from collections import namedtuple
+
+SensorData = namedtuple("SensorData", ["raw", "threshold", "timestamp", "valveState"])
 
 # This class will be used to read data from the BoardInteractor, And store it to an excel file.
 class DataHandler:
+    
     fileNamePrefix = "Gas_Measurment_"
     writeLock = threading.Lock()
 
@@ -25,34 +29,30 @@ class DataHandler:
         
     def append(self,value): ##This is called from beginDataStream
         with self.writeLock:
-            self.workbook.active.append(value)
+            data = SensorData(*value)
+            self.workbook.active.append(list(data))
+
+    def save(self):
+        print(f"attempting save.. ")
+        with self.writeLock:
+            print("Saving... ")
+            self.workbook.save(self.getFileNameWithSuffix())
 
     def beginDataStream(self):
-        queue:Queue = self.interactor.dataQueue
-        value = None
-        while True:
-            
-            newValue = queue.get_nowait()
-            if not newValue == value: # Do not add new values to workbook if they are duplicates. 
-                value = newValue
-                self.append(value)
-            else:
-                print(f"new value is duplicate of value.\n Old Value: {value} \n New Value {newValue}")    
-
-    def getSheetName(self): # The most recent sheet will be named after todays date. (day_month)
-        return datetime.now().day+"_"+datetime.now().month
-
-    def getDayMonthYear(self):
-        return datetime.now().day+"_"+self.getMonthYear()
-    
-    def getMonthYear(self):
-        return datetime.now().month+"_"+datetime.now().year
-
-    def getFileName(self):
-        return self.fileNamePrefix + datetime.now().month+"_"+datetime.now().year
-
-    def getFileNameWithSuffix(self):
-        return self.getFileName()+".xlsx"
+        try:
+            queue:Queue = self.interactor.dataQueue
+            value = None
+            while True:
+                
+                newValue = queue.get_nowait()
+                if not newValue == value: # Do not add new values to workbook if they are duplicates. 
+                    value = newValue
+                    self.append(value)
+               
+                # else:
+                    # print(f"new value is duplicate of value.\n Old Value: {value} \n New Value {newValue}")    
+        except Exception as E:
+            print("Exception on data stream. ")
 
     def createSheet(self,wb:Workbook):
         sheet = wb.create_sheet(self.getDayMonthYear())
@@ -78,11 +78,18 @@ class DataHandler:
                     print(f"Sheets found: {workbook.sheetnames}")
                     sheet = self.createSheet(workbook)
                     workbook.active = sheet
+              
+                columns = {
+                    'raw': 'A',
+                    'threshold': 'B',
+                    'timestamp': 'C',
+                    'valveState': 'D'
+                }
+                sheet.append(list(columns))
                 return workbook
             except Exception as E:
                 print("Filed to load workbook from existing file. "+E.with_traceback())
             
-
     def createNewWorkbook(self): # This is called inside searchForWorkbook
         try:
             workbook = openpyxl.Workbook()
@@ -92,5 +99,20 @@ class DataHandler:
             workbook.save(self.getFileNameWithSuffix())
         except Exception as E:
             print("Failed to setup workbook from scratch. Exception: \n\n "+E.with_traceback)
+
+    def getSheetName(self): # The most recent sheet will be named after todays date. (day_month)
+        return str(datetime.now().day)+"_"+str(datetime.now().month)
+
+    def getDayMonthYear(self):
+        return str(datetime.now().day)+"_"+str(self.getMonthYear())
+    
+    def getMonthYear(self):
+        return str(datetime.now().month)+"_"+str(datetime.now().year)
+
+    def getFileName(self):
+        return self.fileNamePrefix + str(datetime.now().month)+"_"+str(datetime.now().year)
+
+    def getFileNameWithSuffix(self):
+        return self.getFileName()+".xlsx"
         
     

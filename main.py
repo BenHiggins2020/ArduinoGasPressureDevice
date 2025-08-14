@@ -2,6 +2,8 @@ from tkinter import *
 from tkinter import ttk
 import tkinter as tk
 from repository.BoardSetupHandler import BoardSetupHandler
+from repository.BoardInteractor import BoardInteractor
+from repository.appState import AppState
 from serial.tools.list_ports_common import *
 import threading
 from application.setupFrame import SetupFrame
@@ -14,8 +16,9 @@ root.geometry("600x600")
 root.title("Pressure Measurement Controller")
 
 
-isConnected = threading.Event() # Reactive and shared connection state.
 
+
+appState = AppState()
 boardSetterUpper = BoardSetupHandler()
 
 # Main frame
@@ -30,7 +33,7 @@ notebook.pack(fill="both", expand=True, padx=10, pady=10)
 controls_tab = tk.Frame(notebook, bg="#F0F0F0")
 notebook.add(controls_tab, text="Controls")
 print("creating setup frame")
-setupFrame = SetupFrame(controls_tab,boardSetterUpper)
+setupFrame = SetupFrame(controls_tab,boardSetterUpper,appState=appState)
 
 
 # === Tab 2: Plot ===
@@ -42,7 +45,11 @@ notebook.add(plot_tab, text="Live Plot")
 # === Tab 3: Settings ===
 excel_tab = tk.Frame(notebook, bg="#F8F8F8")
 notebook.add(excel_tab, text="Excel")
-excel_frame = ExcelFrame(excel_tab)
+excel_frame = ExcelFrame(excel_tab,appState=appState)
+
+if appState.boardSetupEvent.is_set():
+    print("Main: is setup, inject into excel dataHandler. ")
+    excel_frame.setInteractor(setupFrame.boardInteractor)
 
 # === Tab 4: Help ===
 help_tab = tk.Frame(notebook, bg="#F8F8F8")

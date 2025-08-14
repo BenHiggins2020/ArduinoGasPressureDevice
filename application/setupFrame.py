@@ -5,21 +5,27 @@ import tkinter as tk
 from repository.BoardSetupHandler import BoardSetupHandler
 from serial.tools.list_ports_common import *
 import threading
+from threading import Event
 from repository.BoardSetupHandler import *
 from repository.BoardInteractor import *
-
+from repository.appState import AppState
 ## This will create the tkinter ui for the controls tab. 
 # the controls tab includes connecting to the arduino
 # and modifying the sensor values.
 class SetupFrame:
-    def __init__(self, tab:Frame, boardSetupHandler):
+    def __init__(self, tab:Frame, boardSetupHandler, appState:AppState):
+        self.appState = appState        
         self.controls_tab = tab
         self.boardSetterUpper:BoardSetupHandler = boardSetupHandler
         self.selectedPort = tk.StringVar()
         self.connectionMessage = tk.StringVar()
         self.triggerValue = tk.DoubleVar()
-        # self.isConnected = tk.BooleanVar()
-        self.isConnected = False
+
+        self.boardSetup = threading.Event() # This is the local event which will trigger the parent event.
+
+        self.isConnected = tk.BooleanVar()
+
+        # self.isConnected = isConnectedEvent
         self.boardInteractor:BoardInteractor = None
 
         self.ports = self.boardSetterUpper.getAllPortNamesAndDevices()
@@ -41,7 +47,7 @@ class SetupFrame:
         self.selectedPort.set(self.boardSetterUpper.ArduinoPort)
 
 
-        ##Connection indicator light
+        # Connection indicator light
         self.lightCanvas:Canvas = tk.Canvas(self.connection_frame, width=100, height=50, bg="#E0E0E0", highlightthickness=0)
         self.lightCanvas.grid(row=1,column=1)
         self.greenLight = self.lightCanvas.create_oval(25, 10, 55, 40, fill="gray", outline="black",)
@@ -56,26 +62,30 @@ class SetupFrame:
             print(f"port selected = {port} ")
             value = map.get( self.selectedPort.get())
             print(f"value = {value} ")
+
             self.connectionMessage.set("Connecting... Please wait")
             self.connectionLabel.update_idletasks()
-            self.isConnected = self.boardSetterUpper.connect(value)
+            self.setConnectionState( self.boardSetterUpper.connect(value) )
             
-            if self.isConnected:   
+            if self.isConnected.get():   
                 self.lightCanvas.itemconfig(self.greenLight,fill="green")
-                # self.connection_frame.config(self.connectionLabel,text="Arduino Connected.")
-                # self.boardInteractor = BoardInteractor(self.boardSetterUpper.board) 
                 self.connectionMessage.set("Arduino Connected.")
                 self.connectionLabel.update_idletasks()
                 self.submitBtn.config(state="active")
                 self.beginDataCollectionBtn.config(state="active")
                 self.printDataBtn.config(state="active")
-                self.boardInteractor = BoardInteractor(self.boardSetterUpper.board) 
 
+                ## Setup board interactor , apply callbacks to trigger board setup events. 
+                self.boardInteractor = BoardInteractor(self.boardSetterUpper.board) 
+                self.appState.setBoardInteractor(self.boardInteractor)
+                print("board setup. invoking callbacks...")
+                self.appState.invokeBoardSetupCallbacks()
 
             else:
                 self.lightCanvas.itemconfig(self.greenLight,fill="red")
                 self.connectionMessage.set("Arduino Connection Failed.\n Please make sure arduino is connected or try refreshing port list.")
                 self.connectionLabel.update_idletasks()
+                self.boardSetup.clear()
 
         def refreshPortList():
             self.ports = self.boardSetterUpper.getAllPortNamesAndDevices()
@@ -86,14 +96,16 @@ class SetupFrame:
             
             # self.combo.grid(row=0,column=1,columnspan=3)
 
-            self.isConnected = self.boardSetterUpper.isConnected
+            self.setConnectionState( self.boardSetterUpper.isConnected )
 
-            if self.isConnected:   
+            if self.isConnected.get(): ## This shouldn't happen... 
+
                 # self.lightCanvas.itemconfig(self.greenLight,fill="green")
                 # self.connection_frame.config(self.connectionLabel,text="Arduino Connected.")
                 
                 self.connectionMessage.set("Arduino Connected.")
                 self.connectionLabel.update_idletasks()
+                self.boardSetup.set()
                
             else:
                 self.lightCanvas.itemconfig(self.greenLight,fill="grey")
@@ -103,6 +115,7 @@ class SetupFrame:
 
                 self.connectionMessage.set("Arduino not connected")
                 self.connectionLabel.update_idletasks()
+                self.boardSetup.clear()
 
 
         tk.Button(self.connection_frame, text="Connect",command=connect).grid(row=1, column=0, pady=10)
@@ -123,12 +136,12 @@ class SetupFrame:
         entry = tk.Entry(self.arduino_controller,bg="lightgrey",textvariable=self.triggerValue)
         entry.grid(row=2,column=1,padx=5,pady=5)
 
-        if self.isConnected:
+        if self.isConnected.get():
             self.boardInteractor = BoardInteractor(self.boardSetterUpper.board)
 
         def submit():
             try:
-                if self.isConnected:
+                if self.isConnected.get():
                     voltage = float(self.triggerValue.get())
                     sensorValue = voltage / 5 
                     pressure = (voltage -0.225) / 0.7665
@@ -136,28 +149,28 @@ class SetupFrame:
                 else:
                     print("Could not set threshold because board is not connected.")
             except Exception as E:
-                print("Failed to set threshold. "+E.with_traceback)
+                print("Failed to set threshold. "+str(E))()
 
         def recurringcall():
             while True:
                 data = self.boardInteractor.getData()
                 value = data.get_nowait()
                 self.dataValue.config(text=value)
-                print(f"{value}")
+                # print(f"{value}")
 
         def pullDataQueue():
            threading.Thread(target=recurringcall,daemon=True).start()
 
         def beginDataCollection():
             try:
-                if self.isConnected:
+                if self.isConnected.get():
                     self.boardInteractor.running = True
                     dataCollectionThread = threading.Thread(target=self.boardInteractor.run, daemon=True)
                     dataCollectionThread.start()
                 else:
                     print("Failed to start data collection. ")
             except Exception as E:
-                print("Failed to begin data collection: "+E.with_traceback)
+                print("Failed to begin data collection: "+str(E))
 
         # self.currentDataValue = tk.LabelFrame(self.arduino_controller,text="Current Sensor Reading",bg="#C5CBA4")
         self.currentDataValue = tk.LabelFrame(self.arduino_controller, bg="#C5CBA4",text="Current Sensor Reading")
@@ -179,6 +192,9 @@ class SetupFrame:
 
 
         #Begin collecting data
+
+    def setConnectionState(self, connectionState:bool):
+            self.isConnected.set(connectionState)
 
     def getFrame(self):
         return self.connection_frame

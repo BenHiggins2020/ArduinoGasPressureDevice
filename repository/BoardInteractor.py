@@ -2,6 +2,7 @@ from pyfirmata import Arduino, util
 import queue
 import threading
 from datetime import datetime
+
 # This class simply interacts with the Arduino board. 
 # it will read sensor values and write to the digital pin.
 # It will output values to a queue.
@@ -21,7 +22,7 @@ class BoardInteractor:
         self.dataQueue = queue.Queue() #data queue will receive raw values ONLY
 
         if(triggerValue == None):
-            self.ValveTriggerValue = 2.5 # This will be a default value for the valve   
+            self.ValveTriggerValue = .5 # This will be a default value for the valve   
         else:
             self.ValveTriggerValue = triggerValue
        
@@ -32,11 +33,9 @@ class BoardInteractor:
     def setThreshold(self,newValue:float):
         with self.valueChangedLock:
             self.ValveTriggerValue = newValue
-        print(f"thresholdValue updated: {self.ValveTriggerValue}")
     
     def getThreshold(self):
         with self.valueChangedLock:
-            print(self.ValveTriggerValue)
             return self.ValveTriggerValue
     
     #This command will read sensor data only
@@ -47,11 +46,9 @@ class BoardInteractor:
             if(raw is not None):
                 
                 threshold = self.getThreshold()
-                # print(f"sensor: {raw} , threshold: {threshold}")
                 if(raw >= threshold):
                     self.writePin.write(1)
                     valveState = "OPEN"
-                    # print("OPEN")
                 else:
                     self.writePin.write(0)
                     valveState = "CLOSED"
@@ -62,4 +59,3 @@ class BoardInteractor:
 
                 #for this case we are reading valid values.
 
-        
