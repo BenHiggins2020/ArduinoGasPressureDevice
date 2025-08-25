@@ -20,9 +20,15 @@ class ExcelFrame:
         self.appState = appState
         self.lf = LabelFrame(frame,text="Run ExcelSheet. ")
         self.lf.grid(column=0,columnspan=5,row=0,padx=10,pady=10)
+
         self.runBtn = tk.Button(self.lf,text="Load Excel")
-        self.runBtn.grid(column=3,row=1)
+        self.runBtn.grid(column=3,row=1,columnspan=2, padx=5,pady=5)
         self.runBtn.config(state="disabled")
+
+        self.saveBtn = tk.Button(self.lf,text="Save")
+        self.saveBtn.grid(column=4,row=3,columnspan=2,padx=5,pady=5)
+        self.saveBtn.config(state="disabled")
+
         print("adding callbacks to list! ")
         appState.addToIsBoardSetupCallback(self.inject)
         appState.addToIsBoardSetupCallback(self.setupExcelButton)
@@ -37,5 +43,7 @@ class ExcelFrame:
 
     def setupExcelButton(self):
         self.runBtn.config(state="active",command=self.dataHandler.connect)
+        self.saveBtn.config(state="active",command=self.dataHandler.save)
+
         
          

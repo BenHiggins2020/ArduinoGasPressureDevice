@@ -6,6 +6,7 @@ from repository.BoardSetupHandler import BoardSetupHandler
 from serial.tools.list_ports_common import *
 import threading
 from threading import Event
+from queue import Empty
 from repository.BoardSetupHandler import *
 from repository.BoardInteractor import *
 from repository.appState import AppState
@@ -154,7 +155,13 @@ class SetupFrame:
         def recurringcall():
             while True:
                 data = self.boardInteractor.getData()
-                value = data.get_nowait()
+            
+                try:
+                    value = data.get(timeout=0.5)  # Wait up to 0.5 seconds
+                except Empty:
+                    # Still empty after timeout
+                    pass
+                
                 self.dataValue.config(text=value)
                 # print(f"{value}")
 

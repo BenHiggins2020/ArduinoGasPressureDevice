@@ -10,6 +10,7 @@ from datetime import datetime
 class BoardInteractor:
     
     valueChangedLock = threading.Lock()
+    exportDataLock = threading.Lock()
 
     # TODO: Add criteria to connect to the board. 
     def __init__(self,board:Arduino, triggerValue:float = None):
@@ -28,7 +29,8 @@ class BoardInteractor:
        
 
     def getData(self):
-        return self.dataQueue       
+        with self.exportDataLock:
+            return self.dataQueue       
 
     def setThreshold(self,newValue:float):
         with self.valueChangedLock:
@@ -44,7 +46,6 @@ class BoardInteractor:
         while self.running:
             raw = self.readPin.read()
             if(raw is not None):
-                
                 threshold = self.getThreshold()
                 if(raw >= threshold):
                     self.writePin.write(1)
@@ -52,7 +53,6 @@ class BoardInteractor:
                 else:
                     self.writePin.write(0)
                     valveState = "CLOSED"
-
                 self.dataQueue.put({"raw":raw, "threshold":threshold, "timestamp":datetime.now().strftime("%H:%M:%S.%f")[:-3], "valveState":valveState})
 
 

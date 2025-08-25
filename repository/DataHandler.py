@@ -7,6 +7,7 @@ import queue
 import threading
 from queue import *
 from collections import namedtuple
+import traceback
 
 SensorData = namedtuple("SensorData", ["raw", "threshold", "timestamp", "valveState"])
 
@@ -15,6 +16,7 @@ class DataHandler:
     
     fileNamePrefix = "Gas_Measurment_"
     writeLock = threading.Lock()
+    isSetup = False
 
     def __init__(self,boardInteractor:BoardInteractor):
         self.interactor = boardInteractor
@@ -22,7 +24,9 @@ class DataHandler:
 
     def connect(self):
         print("Starting Excel Writing program. ")
-        self.workbook = self.searchForWorkbook()
+        if not self.isSetup:
+            print("Workbook not successfully setup...")
+            self.workbook = self.searchForWorkbook()
         print("Workbook is setup successfully.")
         stream = threading.Thread(target=self.beginDataStream,daemon=True)
         stream.start()
@@ -30,7 +34,10 @@ class DataHandler:
     def append(self,value): ##This is called from beginDataStream
         with self.writeLock:
             data = SensorData(*value)
-            self.workbook.active.append(list(data))
+            try:
+                self.workbook.active.append(list(data))
+            except Exception as e:
+                print("Failed to append to workbook w/ "+traceback.print_exc())
 
     def save(self):
         print(f"attempting save.. ")
@@ -40,22 +47,30 @@ class DataHandler:
 
     def beginDataStream(self):
         try:
-            queue:Queue = self.interactor.dataQueue
+            queue:Queue = self.interactor.getData()
             value = None
             while True:
-                
-                newValue = queue.get_nowait()
+
+                newValue = queue.get()
                 if not newValue == value: # Do not add new values to workbook if they are duplicates. 
                     value = newValue
+                    print("Append value")
                     self.append(value)
                
                 # else:
                     # print(f"new value is duplicate of value.\n Old Value: {value} \n New Value {newValue}")    
         except Exception as E:
-            print("Exception on data stream. ")
+            print("Exception on data stream: \n"+traceback.print_exc())
 
     def createSheet(self,wb:Workbook):
         sheet = wb.create_sheet(self.getDayMonthYear())
+        columns = {
+                    'raw': 'A',
+                    'threshold': 'B',
+                    'timestamp': 'C',
+                    'valveState': 'D'
+                }
+        self.append(list(columns))
         return sheet
 
     def searchForWorkbook(self):
@@ -75,17 +90,15 @@ class DataHandler:
                     workbook.active = sheet
                 else:
                     print(f"Sheet with for date (name) {self.getDayMonthYear()} was NOT found.")
-                    print(f"Sheets found: {workbook.sheetnames}")
+                    
                     sheet = self.createSheet(workbook)
                     workbook.active = sheet
+                    workbook.save(self.getFileNameWithSuffix())
               
-                columns = {
-                    'raw': 'A',
-                    'threshold': 'B',
-                    'timestamp': 'C',
-                    'valveState': 'D'
-                }
-                sheet.append(list(columns))
+                
+                
+                workbook.save(self.getFileNameWithSuffix())
+                self.isSetup = True
                 return workbook
             except Exception as E:
                 print("Filed to load workbook from existing file. "+E.with_traceback())
