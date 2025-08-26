@@ -20,7 +20,7 @@ class SensorRecord:
 
     def to_row(self):
         """Convert the record to a list suitable for Excel appending."""
-        return [self.raw, self.threshold, self.timestamp, self.valveState]
+        return [ self.timestamp, self.raw, self.threshold, self.valveState]
 
 TAG = "[DataHandler]\t"
 
@@ -29,6 +29,9 @@ class DataHandler:
     fileNamePrefix = "Gas_Measurment_"
     writeLock = threading.Lock()
     setupLock = threading.Lock()
+    saveLock = threading.Lock()
+    shouldSavePeriodically = True
+    saveInterval = 1 # second
     isSetup = False
 
     def __init__(self,boardInteractor:BoardInteractor):
@@ -43,6 +46,8 @@ class DataHandler:
         print(f"{TAG} Workbook is setup successfully.")
         stream = threading.Thread(target=self.beginDataStream,daemon=True)
         stream.start()
+        periodicSave = threading.Thread(target=self.periodicSave,daemon=True)
+        periodicSave.start()
         
     def setHeaders(self,headers:list): # This is used in setup and createSheet
         with self.writeLock:
@@ -57,8 +62,8 @@ class DataHandler:
             except Exception as e:
                 print(f"{TAG}Failed to append to workbook w/ "+traceback.print_exc())
 
-    def append(self,value:SensorRecord): ##This is called from beginDataStream
-        with self.writeLock:
+    def append(self,value:SensorRecord): ##This is called from beginDataStream@Tyler
+        with self.saveLock:
             if(not self.workbook):
                 print(f"{TAG}Workbook not setup, cannot append data. ")
                 return
@@ -71,9 +76,33 @@ class DataHandler:
 
     def save(self):
         print(f"{TAG}attempting save.. ")
-        with self.writeLock:
+        with self.saveLock:
             print(f"{TAG}Saving... ")
             self.workbook.save(self.getFileNameWithSuffix())
+
+    def setSaveInterval(self,interval:int):
+        with self.saveLock:
+            print(f"{TAG}setSaveInterval({interval})")
+            self.saveInterval = interval
+
+    def periodicSave(self):
+        print(f"{TAG}periodicSave()")   
+        if not self.isSetup:
+            print(f"{TAG}Workbook not setup, attempting to setup...")
+            return
+        else:
+            print(f"{TAG}Workbook is setup, beginning periodic save...")
+
+        try:
+            while self.shouldSavePeriodically:
+                
+                with self.writeLock:
+                    print(f"{TAG}Periodic save triggered. ")
+                    self.save()
+                    threading.Event().wait(self.saveInterval) # wait 5 minutes before saving again.
+        except Exception as E:
+            print("Exception on periodic save: \n"+traceback.print_exc())
+
 
     def beginDataStream(self):
         print(f"{TAG}beginDataStream")
@@ -118,18 +147,17 @@ class DataHandler:
                 print(f"{TAG}Workbook not found, creating work book.")
                 self.createNewWorkbook()
             else:
-                print(f"{TAG}Workbook found.")
+                print(f"{TAG}Workbook found: {self.getFileNameWithSuffix()}")
                 
                 try:
-                    workbook = openpyxl.load_workbook(self.getFileNameWithSuffix())
-                    print(f"{TAG}Sheets found: {workbook.sheetnames}")
-                    self.workbook = workbook
+                    self.workbook = openpyxl.load_workbook(self.getFileNameWithSuffix())
+                    print(f"{TAG}Sheets found: {self.workbook.sheetnames}")
                 
                     # If a sheet for today is found, we want to open it and use it, otherwise create new sheet. 
-                    if self.getSheetName() in workbook.sheetnames:
+                    if self.getSheetName() in self.workbook.sheetnames:
                         print(f"{TAG}Sheet with for date (name) {self.getSheetName()} was found.")
-                        self.sheet = workbook[self.getSheetName()]
-                        workbook.active = self.sheet
+                        self.sheet = self.workbook[self.getSheetName()]
+                        self.workbook.active = self.sheet
                         # if sheet is found, check to make sure firs
                         # t row is not empty, and if so add headers.
                         if self.is_row_empty(1):
@@ -141,24 +169,28 @@ class DataHandler:
                                 'valveState': 'D'
                             }
                             self.setHeaders(list(columns))
-                            workbook.save(self.getFileNameWithSuffix())
+
+                        self.workbook.save(self.getFileNameWithSuffix())
+                        self.isSetup = True
+                        print(f"{TAG}Workbook setup complete.")
+                        return self.workbook
                     else:
                         print(f"{TAG}Sheet with for date (name) {self.getSheetName()} was NOT found.")
-                        self.sheet = self.createSheet(workbook)
-                        workbook.active = self.sheet
-                        workbook.save(self.getFileNameWithSuffix())
+                        self.sheet = self.createSheet(self.workbook)
+                        self.workbook.active = self.sheet
+                        self.workbook.save(self.getFileNameWithSuffix())
+                        self.isSetup = True
+                        print(f"{TAG}Workbook setup complete.")
+                        return self.workbook
 
                 except Exception as E:
-                    print(f"{TAG}Filed to load workbook from existing file. "+traceback.print_exc())
+                    print(f"{TAG}Failed to load workbook from existing file. {traceback.print_exc()}")
+                    # TODO: Handle corrupted file case.
                 
                 
-                workbook.save(self.getFileNameWithSuffix())
-                self.isSetup = True
-                self.workbook = workbook
-                print(f"{TAG}Workbook setup complete.")
-                return self.workbook
+                
+                
             
-
     def is_row_empty(self, row_num):
         for cell in self.workbook.active[row_num]:
             if cell.value not in (None, '') and str(cell.value).strip():
@@ -167,13 +199,13 @@ class DataHandler:
       
     def createNewWorkbook(self): # This is called inside searchForWorkbook
         try:
-            workbook = openpyxl.Workbook()
-            sheet = workbook.active
+            self.workbook = openpyxl.Workbook()
+            sheet = self.workbook.active
             sheet.title = self.getFileName()+"_"+self.getDayMonthYear()
-            sheet = self.createSheet(workbook)
-            workbook.save(self.getFileNameWithSuffix())
+            sheet = self.createSheet(self.workbook)
+            self.workbook.save(self.getFileNameWithSuffix())
         except Exception as E:
-            print("Failed to setup workbook from scratch. Exception: \n\n "+E.with_traceback)
+            print(f"{TAG}Failed to setup workbook from scratch. Exception: \n\n {E.with_traceback}")
 
     def getSheetName(self): # The most recent sheet will be named after todays date. (day_month)
         return str(datetime.now().day)+"_"+str(datetime.now().month)
