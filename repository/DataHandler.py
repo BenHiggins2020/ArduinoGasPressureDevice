@@ -8,14 +8,27 @@ import threading
 from queue import *
 from collections import namedtuple
 import traceback
+from dataclasses import dataclass
 
 SensorData = namedtuple("SensorData", ["raw", "threshold", "timestamp", "valveState"])
+@dataclass
+class SensorRecord:
+    raw: float
+    threshold: float
+    timestamp: str
+    valveState: str
+
+    def to_row(self):
+        """Convert the record to a list suitable for Excel appending."""
+        return [self.raw, self.threshold, self.timestamp, self.valveState]
+
+TAG = "[DataHandler]\t"
 
 # This class will be used to read data from the BoardInteractor, And store it to an excel file.
 class DataHandler:
-    
     fileNamePrefix = "Gas_Measurment_"
     writeLock = threading.Lock()
+    setupLock = threading.Lock()
     isSetup = False
 
     def __init__(self,boardInteractor:BoardInteractor):
@@ -23,29 +36,53 @@ class DataHandler:
         self.workbook = self.searchForWorkbook()
 
     def connect(self):
-        print("Starting Excel Writing program. ")
+        print(f"{TAG} Starting Excel Writing program. ")
         if not self.isSetup:
             print("Workbook not successfully setup...")
             self.workbook = self.searchForWorkbook()
-        print("Workbook is setup successfully.")
+        print(f"{TAG} Workbook is setup successfully.")
         stream = threading.Thread(target=self.beginDataStream,daemon=True)
         stream.start()
         
-    def append(self,value): ##This is called from beginDataStream
+    def setHeaders(self,headers:list): # This is used in setup and createSheet
         with self.writeLock:
-            data = SensorData(*value)
+            if(not self.workbook):
+                print(f"{TAG}Workbook not setup, cannot set headers. ")
+                return
+            
+            print(f"{TAG}Setting headers {headers}")
             try:
-                self.workbook.active.append(list(data))
+                for col, header in enumerate(headers, start=1):
+                    self.workbook.active.cell(row=1, column=col, value=header)                # self.workbook.active.append(headers)
             except Exception as e:
-                print("Failed to append to workbook w/ "+traceback.print_exc())
+                print(f"{TAG}Failed to append to workbook w/ "+traceback.print_exc())
+
+    def append(self,value:SensorRecord): ##This is called from beginDataStream
+        with self.writeLock:
+            if(not self.workbook):
+                print(f"{TAG}Workbook not setup, cannot append data. ")
+                return
+            
+            print(f"{TAG}Append value {value}")
+            try:
+                self.workbook.active.append(value.to_row())
+            except Exception as e:
+                print(f"{TAG}Failed to append to workbook w/ "+traceback.print_exc())
 
     def save(self):
-        print(f"attempting save.. ")
+        print(f"{TAG}attempting save.. ")
         with self.writeLock:
-            print("Saving... ")
+            print(f"{TAG}Saving... ")
             self.workbook.save(self.getFileNameWithSuffix())
 
     def beginDataStream(self):
+        print(f"{TAG}beginDataStream")
+        if not self.isSetup:
+            print(f"{TAG}Workbook not setup, attempting to setup...")
+            return
+        else:
+            print(f"{TAG}Workbook is setup, beginning data stream...")
+
         try:
             queue:Queue = self.interactor.getData()
             value = None
@@ -54,8 +91,8 @@ class DataHandler:
                 newValue = queue.get()
                 if not newValue == value: # Do not add new values to workbook if they are duplicates. 
                     value = newValue
-                    print("Append value")
-                    self.append(value)
+                    sensorRecord = SensorRecord(**value)
+                    self.append(sensorRecord)
                
                 # else:
                     # print(f"new value is duplicate of value.\n Old Value: {value} \n New Value {newValue}")    
@@ -63,46 +100,71 @@ class DataHandler:
             print("Exception on data stream: \n"+traceback.print_exc())
 
     def createSheet(self,wb:Workbook):
-        sheet = wb.create_sheet(self.getDayMonthYear())
+        print(f"{TAG}createSheet name={self.getSheetName()}")
+        sheet = self.workbook.create_sheet(self.getSheetName())
         columns = {
-                    'raw': 'A',
-                    'threshold': 'B',
+                    'Raw Sensor Value': 'A',
+                    'Threshold': 'B',
                     'timestamp': 'C',
                     'valveState': 'D'
                 }
-        self.append(list(columns))
+        self.setHeaders(list(columns))
         return sheet
 
     def searchForWorkbook(self):
-        if not os.path.exists(self.getFileNameWithSuffix()):
-            print("Workbook not found, creating work book.")
-            self.createNewWorkbook()
-        else:
-            print("Workbook found.")
-            try:
-                workbook = openpyxl.load_workbook(self.getFileNameWithSuffix())
-                print(f"Sheets found: {workbook.sheetnames}")
+        with self.setupLock:
+            print(f"{TAG}Searching for workbook...")
+            if not os.path.exists(self.getFileNameWithSuffix()):
+                print(f"{TAG}Workbook not found, creating work book.")
+                self.createNewWorkbook()
+            else:
+                print(f"{TAG}Workbook found.")
+                
+                try:
+                    workbook = openpyxl.load_workbook(self.getFileNameWithSuffix())
+                    print(f"{TAG}Sheets found: {workbook.sheetnames}")
+                    self.workbook = workbook
+                
+                    # If a sheet for today is found, we want to open it and use it, otherwise create new sheet. 
+                    if self.getSheetName() in workbook.sheetnames:
+                        print(f"{TAG}Sheet with for date (name) {self.getSheetName()} was found.")
+                        self.sheet = workbook[self.getSheetName()]
+                        workbook.active = self.sheet
+                        # if sheet is found, check to make sure firs
+                        # t row is not empty, and if so add headers.
+                        if self.is_row_empty(1):
+                            print(f"{TAG} Sheet was empty, adding headers. ")
+                            columns = {
+                                'Raw Sensor Value': 'A',
+                                'Threshold': 'B',
+                                'timestamp': 'C',
+                                'valveState': 'D'
+                            }
+                            self.setHeaders(list(columns))
+                            workbook.save(self.getFileNameWithSuffix())
+                    else:
+                        print(f"{TAG}Sheet with for date (name) {self.getSheetName()} was NOT found.")
+                        self.sheet = self.createSheet(workbook)
+                        workbook.active = self.sheet
+                        workbook.save(self.getFileNameWithSuffix())
 
-                # If a sheet for today is found, we want to open it and use it, otherwise create new sheet. 
-                if self.getDayMonthYear() in workbook.sheetnames:
-                    print(f"Sheet with for date (name) {self.getDayMonthYear()} was found.")
-                    sheet = workbook[self.getDayMonthYear()]
-                    workbook.active = sheet
-                else:
-                    print(f"Sheet with for date (name) {self.getDayMonthYear()} was NOT found.")
-                    
-                    sheet = self.createSheet(workbook)
-                    workbook.active = sheet
-                    workbook.save(self.getFileNameWithSuffix())
-              
+                except Exception as E:
+                    print(f"{TAG}Filed to load workbook from existing file. "+traceback.print_exc())
                 
                 
                 workbook.save(self.getFileNameWithSuffix())
                 self.isSetup = True
-                return workbook
-            except Exception as E:
-                print("Filed to load workbook from existing file. "+E.with_traceback())
+                self.workbook = workbook
+                print(f"{TAG}Workbook setup complete.")
+                return self.workbook
             
+
+    def is_row_empty(self, row_num):
+        for cell in self.workbook.active[row_num]:
+            if cell.value not in (None, '') and str(cell.value).strip():
+                return False
+        return True
+      
     def createNewWorkbook(self): # This is called inside searchForWorkbook
         try:
             workbook = openpyxl.Workbook()

@@ -43,13 +43,13 @@ notebook.add(plot_tab, text="Live Plot")
 # You could embed a matplotlib canvas here later
 
 # === Tab 3: Settings ===
-# excel_tab = tk.Frame(notebook, bg="#F8F8F8")
-# notebook.add(excel_tab, text="Excel")
-# excel_frame = ExcelFrame(excel_tab,appState=appState)
+excel_tab = tk.Frame(notebook, bg="#F8F8F8")
+notebook.add(excel_tab, text="Excel")
+excel_frame = ExcelFrame(excel_tab,appState=appState)
 
-# if appState.boardSetupEvent.is_set():
-#     print("Main: is setup, inject into excel dataHandler. ")
-#     excel_frame.setInteractor(setupFrame.boardInteractor)
+if appState.boardSetupEvent.is_set():
+    print("Main: is setup, inject into excel dataHandler. ")
+    excel_frame.setInteractor(setupFrame.boardInteractor)
 
 # === Tab 4: Help ===
 help_tab = tk.Frame(notebook, bg="#F8F8F8")
