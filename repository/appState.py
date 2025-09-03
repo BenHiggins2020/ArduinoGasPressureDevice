@@ -3,46 +3,62 @@ from repository.BoardInteractor import BoardInteractor
 
 class AppState:
 
-    isConnected_Callback_List:list = list()
+    onConnectCallback:list = list()
+    onExcelConnectedCallback:list = list()
     callback_isBoardSetup:list = list()
     interactor:BoardInteractor = None
 
     def __init__(self):
-        self.isConnected:Event = Event() # Dont reall need an event
+       pass
 
-        self.boardSetupEvent:Event = Event()
-
-    def addToIsConnectedCallback(self,callback):
-        self.isConnected_Callback_List.append(callback)
-        print(f"callback added: {len(self.isConnected_Callback_List)}")
     
-    def addToIsBoardSetupCallback(self,callback):
+    def addOnExcelConnectedListener(self,callback):
+        self.onExcelConnectedCallback.append(callback)
+        print(f"callback added [excel setup]: {len(self.onConnectCallback)}")
+    
+    def addOnConnectedListener(self,callback):
+        self.onConnectCallback.append(callback)
+        print(f"callback added [connection listener]: {len(self.onConnectCallback)}")
+    
+    def addBoardSetupListener(self,callback):
         self.callback_isBoardSetup.append(callback)
-        print(f"callback added: {len(self.isConnected_Callback_List)}")
+        print(f"callback added [board setup]: {len(self.onConnectCallback)}")
 
 
-    # This is called from other classes. 
+    def setExcelConnected(self):
+        self.invokeOnExcelConnected()
+
+    # Called from other classes once connection to arduino is made.
+    # This invokes the onConnectedListener callbacks to run. 
     def setIsConnected(self):
-        self.invokeConnectionCallbacks()
+        self.invokeOnConnected()
 
     def setBoardIsSetup(self):
         self.invokeBoardSetupCallbacks()
 
+    # Dependency Injection of BoardInteractor.
+    # once called, injectBoardInteractor is able to be used to return an instance of the BoardInteractor.
     def setBoardInteractor(self,bi:BoardInteractor):
         self.interactor = bi
     
     def injectBoardInteractor(self):
         return self.interactor
 
-    def invokeConnectionCallbacks(self):
-        print(f"Invoking callbacks (connection) {len(self.isConnected_Callback_List)}")
+    # invoke onConnected callbacks. 
+    def invokeOnConnected(self):
+        print(f"Invoking callbacks (connection) {len(self.onConnectCallback)}")
 
-        for cb in self.isConnected_Callback_List:
+        for cb in self.onConnectCallback:
             cb()
 
     def invokeBoardSetupCallbacks(self):
         print(f"Invoking callbacks (board setup) {len(self.callback_isBoardSetup)}")
         for cb in self.callback_isBoardSetup:
+            cb()
+
+    def invokeOnExcelConnected(self):
+        print(f"Invoking callbacks (excel setup) {len(self.onExcelConnectedCallback)}")
+        for cb in self.onExcelConnectedCallback:
             cb()
 
 
