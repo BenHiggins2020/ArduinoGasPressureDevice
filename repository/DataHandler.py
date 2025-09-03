@@ -96,7 +96,7 @@ class DataHandler:
         try:
             while self.shouldSavePeriodically:
                 
-                with self.writeLock:
+                with self.saveLock:
                     print(f"{TAG}Periodic save triggered. ")
                     self.save()
                     threading.Event().wait(self.saveInterval) # wait 5 minutes before saving again.
