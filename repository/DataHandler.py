@@ -47,7 +47,7 @@ class DataHandler:
             self.workbook = self.excelSheetHandler.setup()
             self.isSetup = True
         print(f"{TAG} Workbook is setup successfully.")
-        self.stream = threading.Thread(target=self.beingParsingData,daemon=True)
+        self.stream = threading.Thread(target=self.readDataStream,daemon=True)
         self.stream.start()
 
         # periodicSave = threading.Thread(target=self.periodicSave,daemon=True)
@@ -110,7 +110,7 @@ class DataHandler:
         except Exception as E:
             print("Failed to begin data collection: "+str(E))
 
-    def beingParsingData(self):
+    def readDataStream(self):
         print(f"{TAG}beginDataStream")
         if not self.isSetup:
             print(f"{TAG}Workbook not setup, attempting to setup...")

@@ -76,11 +76,12 @@ class SetupFrame:
                 self.beginDataCollectionBtn.config(state="active")
                 self.printDataBtn.config(state="active")
 
+                # TODO: Remove this call, since we no longer use this. (done in connectionFrame)
                 ## Setup board interactor , apply callbacks to trigger board setup events. 
-                self.boardInteractor = BoardInteractor(self.boardSetterUpper.board) 
-                self.appState.setBoardInteractor(self.boardInteractor)
-                print("board setup. invoking callbacks...")
-                self.appState.invokeBoardSetupCallbacks()
+                # self.boardInteractor = BoardInteractor(self.boardSetterUpper.board) 
+                # self.appState.setBoardInteractor(self.boardInteractor)
+                # print("board setup. invoking callbacks...")
+                # self.appState.invokeBoardSetupCallbacks()
 
             else:
                 self.lightCanvas.itemconfig(self.greenLight,fill="red")
