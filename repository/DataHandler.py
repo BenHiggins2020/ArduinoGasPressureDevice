@@ -12,6 +12,10 @@ from collections import namedtuple
 import traceback
 from dataclasses import dataclass
 
+import reactivex
+from reactivex.scheduler import ThreadPoolScheduler
+from reactivex import operators as ops
+
 SensorData = namedtuple("SensorData", ["raw", "threshold", "timestamp", "valveState"])
 @dataclass
 class SensorRecord:
@@ -31,6 +35,8 @@ class DataHandler:
     # writeLock = threading.Lock()
     # setupLock = threading.Lock()
     saveLock = threading.Lock()
+    scheduler = ThreadPoolScheduler()
+    disposable = None
     shouldSavePeriodically = True
     saveInterval = 1 # second
     isSetup = False
@@ -57,6 +63,7 @@ class DataHandler:
         with self.saveLock:
             print(f"{TAG} Stopping data stream...")
             self.stream.join(timeout=1)
+            self.disposable.dispose()
             self.interactor.running = False
 
 
@@ -79,28 +86,13 @@ class DataHandler:
 
     def setSaveInterval(self,interval:int):
         with self.saveLock:
-            print(f"{TAG}setSaveInterval({interval})")
             self.saveInterval = interval
-
-    def periodicSave(self):
-        with self.saveLock:
-            print(f"{TAG}periodicSave()")   
-            if not self.isSetup:
-                print(f"{TAG}Workbook not setup, attempting to setup...")
-                return
-            else:
-                print(f"{TAG}Workbook is setup, beginning periodic save...")
-
-            try:
-                while self.shouldSavePeriodically:
-                    
-                    with self.saveLock:
-                        print(f"{TAG}Periodic save triggered. ")
-                        self.save()
-                        threading.Event().wait(self.saveInterval) # wait 5 minutes before saving again.
-            except Exception as E:
-                print("Exception on periodic save: \n"+traceback.print_exc())
-
+            print(f"{TAG}setSaveInterval({interval})")
+            self.disposable = reactivex.interval(interval).pipe(
+                ops.map(lambda x : print(f"Periodic Save called.. on interval of {interval} s"))
+            ).subscribe(lambda x: self.save())
+    
+    
 
     def startStream(self):
         try:

@@ -41,9 +41,7 @@ class ConnectionFrame:
         excel_tab = LabelFrame(self.controls_tab,text="Excel Setup", bg="#F8F8F8")
         excel_tab.pack(padx=20,pady=20,fill="x")
         # IF THIS IS CALLED BEFORE CONNECTIONLISTENER THERE WILL BE A RACE CONDITION! 
-        excel_frame = ExcelFrame(excel_tab,appState=appState)
-
-
+        self.excel_frame = ExcelFrame(excel_tab,appState=appState)
 
     def doOnConnect(self):
         print(f"{TAG} doOnConnect ")

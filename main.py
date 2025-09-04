@@ -65,9 +65,8 @@ def closeGracefully():
     print("Closing gracefully... ")
 
     try:
-        if excel_frame.dataHandler:
-            print("Saving workbook before exit... ")
-            excel_frame.close()
+        if connectionFrame.excel_frame:
+            connectionFrame.excel_frame.close()
     except Exception as e:
         print(f"Failed to save workbook on exit... Exception: \n\n{e.with_traceback}")
         

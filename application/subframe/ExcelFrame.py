@@ -67,6 +67,7 @@ class ExcelFrame:
     def close(self):
         print("Closing Excel Frame...")
         if self.dataHandler:
+            self.dataHandler.disposable.dispose()
             self.dataHandler.shouldSavePeriodically = False
             self.dataHandler.save()
             self.dataHandler.workbook.close()

@@ -1,6 +1,9 @@
 from repository.BoardInteractor import BoardInteractor
 import openpyxl
+from openpyxl import load_workbook
 from openpyxl import *
+from openpyxl import cell
+from openpyxl import worksheet
 from datetime import datetime
 import os
 import queue
@@ -101,7 +104,12 @@ class ExcelSheetHandler:
         try:
             # for col, header in enumerate(headers, start=1):
             #     self.workbook.active.cell(row=1, column=col, value=header)
-             self.workbook.active.append(headers)
+            sheet:worksheet = self.workbook.active
+            sheet.cell(row=1,column = 1).value = headers[0]
+            sheet.cell(row=1,column = 1).value = headers[1]
+            sheet.cell(row=1,column = 1).value = headers[2]
+            sheet.cell(row=1,column = 1).value = headers[3]
+
         except Exception as e:
             print(f"{TAG}Failed to append to workbook w/ "+traceback.print_exc())
 
@@ -121,7 +129,10 @@ class ExcelSheetHandler:
         return self.getFileName()+".xlsx"
     
     def is_row_empty(self, row_num):
+        print("Checking if row is empty.. ")
         for cell in self.workbook.active[row_num]:
+            
+            print(f"Cell: {cell.value}")
             if cell.value not in (None, '') and str(cell.value).strip():
                 return False
         return True
