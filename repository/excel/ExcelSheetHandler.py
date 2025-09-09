@@ -110,10 +110,10 @@ class ExcelSheetHandler:
             # for col, header in enumerate(headers, start=1):
             #     self.workbook.active.cell(row=1, column=col, value=header)
             sheet:worksheet = self.workbook.active
-            sheet.cell(row=1,column = 1).value = headers[0]
-            sheet.cell(row=1,column = 1).value = headers[1]
             sheet.cell(row=1,column = 1).value = headers[2]
-            sheet.cell(row=1,column = 1).value = headers[3]
+            sheet.cell(row=1,column = 2).value = headers[0]
+            sheet.cell(row=1,column = 3).value = headers[1]
+            sheet.cell(row=1,column = 4).value = headers[3]
 
         except Exception as e:
             print(f"{TAG}Failed to append to workbook w/ "+traceback.print_exc())
