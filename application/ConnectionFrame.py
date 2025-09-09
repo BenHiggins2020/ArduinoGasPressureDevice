@@ -60,7 +60,6 @@ class ConnectionFrame:
         self.connectionLabel.update_idletasks()
         self.boardSetup.clear()
     
-
     def refreshPortList(self):
         self.ports = self.boardSetterUpper.getAllPortNamesAndDevices()
         self.selectedPort.set(self.boardSetterUpper.ArduinoPort)
@@ -120,3 +119,4 @@ class ConnectionFrame:
 
     def getFrame(self):
         return self.connection_frame
+    

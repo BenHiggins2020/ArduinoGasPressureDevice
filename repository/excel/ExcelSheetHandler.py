@@ -27,6 +27,7 @@ class ExcelSheetHandler:
             self.workbook = self.searchForWorkbook()
             if self.workbook:
                 print(f"{TAG} ExcelSheetHandler setup complete.")
+                return self.workbook
             else:
                 print(f"{TAG} ExcelSheetHandler setup failed.")
         except Exception as E:
@@ -77,6 +78,9 @@ class ExcelSheetHandler:
                 except Exception as E:
                     print(f"{TAG}Failed to load workbook from existing file. {traceback.print_exc()}")
                     # TODO: Handle corrupted file case.
+                    print(f"{TAG} failed to open old excell file. data may be corrupted. Creating new excel sheet. ")
+                    return self.createNewWorkbook()
+                    
 
     def createNewWorkbook(self): # This is called inside searchForWorkbook
         try:
@@ -85,6 +89,7 @@ class ExcelSheetHandler:
             sheet.title = self.getFileName()+"_"+self.getDayMonthYear()
             sheet = self.createSheet(self.workbook)
             self.workbook.save(self.getFileNameWithSuffix())
+            return self.workbook
         except Exception as E:
             print(f"{TAG}Failed to setup workbook from scratch. Exception: \n\n {E.with_traceback}")
 

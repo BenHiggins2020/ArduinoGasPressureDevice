@@ -67,10 +67,8 @@ class ExcelFrame:
     def close(self):
         print("Closing Excel Frame...")
         if self.dataHandler:
-            self.dataHandler.disposable.dispose()
-            self.dataHandler.shouldSavePeriodically = False
-            self.dataHandler.save()
-            self.dataHandler.workbook.close()
+            self.dataHandler.close()
+           
 
     def setupUi(self):  
         self.lf.grid(column=0,sticky="nsew",row=0, pady=10,padx=10)
